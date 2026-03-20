@@ -74,7 +74,7 @@ export default function ClientDashboard() {
   }, []);
 
   const PAGE_TITLES: Record<Tab, { title: string; sub: string }> = {
-    dashboard:  { title: "Energy Dashboard",        sub: "Real-time solar production, consumption & AI optimization" },
+    dashboard:  { title: "Live Energy Dashboard",        sub: "Real-time solar production, consumption & AI optimization" },
     prediction: { title: "Solar Prediction Engine", sub: "24-hour forecast using live weather data from Open-Meteo" },
     map:        { title: "Odisha Grid Map",          sub: "Energy nodes and live flow across Odisha" },
   };
