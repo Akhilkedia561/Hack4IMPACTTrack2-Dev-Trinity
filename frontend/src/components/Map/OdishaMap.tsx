@@ -1,18 +1,18 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { EnergyNode } from "@/types/energy";
 
 const NODES: EnergyNode[] = [
-  { id: "bbsr",  name: "Bhubaneswar Solar Farm",    lat: 20.2961, lng: 85.8245, type: "solar",    value: 8.4,  status: "active"  },
-  { id: "ctk",   name: "Cuttack Battery Hub",        lat: 20.4625, lng: 85.8830, type: "battery",  value: 78,   status: "active"  },
-  { id: "rkl",   name: "Rourkela Grid Node",          lat: 22.2604, lng: 84.8536, type: "grid",     value: 12.1, status: "active"  },
-  { id: "puri",  name: "Puri Coastal Solar",          lat: 19.8135, lng: 85.8312, type: "solar",    value: 6.2,  status: "active"  },
-  { id: "smb",   name: "Sambalpur Consumer",          lat: 21.4669, lng: 83.9756, type: "consumer", value: 4.8,  status: "idle"    },
-  { id: "bhm",   name: "Berhampur Solar",             lat: 19.3150, lng: 84.7941, type: "solar",    value: 5.9,  status: "active"  },
-  { id: "krl",   name: "Koraput Battery",             lat: 18.8120, lng: 82.7097, type: "battery",  value: 32,   status: "warning" },
-  { id: "ang",   name: "Angul Industrial Grid",       lat: 20.8380, lng: 85.1010, type: "grid",     value: 18.5, status: "active"  },
-  { id: "blgr",  name: "Balangir Solar Park",         lat: 20.7108, lng: 83.4842, type: "solar",    value: 7.1,  status: "active"  },
-  { id: "kndml", name: "Kandhamal Heatwave Zone",     lat: 20.1167, lng: 84.2333, type: "consumer", value: 9.2,  status: "warning" },
+  { id: "bbsr",  name: "Bhubaneswar Solar Farm",  lat: 20.2961, lng: 85.8245, type: "solar",    value: 8.4,  status: "active"  },
+  { id: "ctk",   name: "Cuttack Battery Hub",      lat: 20.4625, lng: 85.8830, type: "battery",  value: 78,   status: "active"  },
+  { id: "rkl",   name: "Rourkela Grid Node",        lat: 22.2604, lng: 84.8536, type: "grid",     value: 12.1, status: "active"  },
+  { id: "puri",  name: "Puri Coastal Solar",        lat: 19.8135, lng: 85.8312, type: "solar",    value: 6.2,  status: "active"  },
+  { id: "smb",   name: "Sambalpur Consumer",        lat: 21.4669, lng: 83.9756, type: "consumer", value: 4.8,  status: "idle"    },
+  { id: "bhm",   name: "Berhampur Solar",           lat: 19.3150, lng: 84.7941, type: "solar",    value: 5.9,  status: "active"  },
+  { id: "krl",   name: "Koraput Battery",           lat: 18.8120, lng: 82.7097, type: "battery",  value: 32,   status: "warning" },
+  { id: "ang",   name: "Angul Industrial Grid",     lat: 20.8380, lng: 85.1010, type: "grid",     value: 18.5, status: "active"  },
+  { id: "blgr",  name: "Balangir Solar Park",       lat: 20.7108, lng: 83.4842, type: "solar",    value: 7.1,  status: "active"  },
+  { id: "kndml", name: "Kandhamal Heatwave Zone",   lat: 20.1167, lng: 84.2333, type: "consumer", value: 9.2,  status: "warning" },
 ];
 
 const TYPE_META = {
@@ -28,40 +28,151 @@ const STATUS_META = {
   warning: { color: "#eb4425", label: "Warning" },
 };
 
-// Convert lat/lng to pixel position within Odisha bounding box
-// Odisha approx: lat 17.8–22.6, lng 81.3–87.5
-const LAT_MIN = 17.8, LAT_MAX = 22.6;
-const LNG_MIN = 81.3, LNG_MAX = 87.5;
+const FLOWS: [string, string][] = [
+  ["bbsr","ctk"],["ctk","ang"],["ang","rkl"],
+  ["puri","bbsr"],["bhm","puri"],["smb","rkl"],
+  ["blgr","smb"],["kndml","bbsr"],["krl","kndml"],
+];
 
-function toPercent(lat: number, lng: number) {
-  const x = ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)) * 100;
-  const y = ((LAT_MAX - lat) / (LAT_MAX - LAT_MIN)) * 100;
-  return { x, y };
+function makeIcon(L: any, node: EnergyNode, live: number) {
+  const m = TYPE_META[node.type];
+  const isWarn = node.status === "warning";
+  return L.divIcon({
+    className: "",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+    html: `
+      <div style="position:relative;width:0;height:0;cursor:pointer;">
+        <div style="
+          position:absolute;width:40px;height:40px;border-radius:50%;
+          background:${m.color}22;border:1.5px solid ${m.color}44;
+          top:-20px;left:-20px;
+          animation:agPulse ${isWarn ? "1s" : "2.8s"} ease-out infinite;
+        "></div>
+        <div style="
+          position:absolute;width:22px;height:22px;border-radius:50%;
+          background:${m.color};border:3px solid white;
+          box-shadow:0 0 12px ${m.color}99,0 2px 8px rgba(0,0,0,0.2);
+          top:-11px;left:-11px;
+          ${isWarn ? "animation:agWarn 0.9s infinite;" : ""}
+        "></div>
+        <div style="
+          position:absolute;top:-38px;left:50%;transform:translateX(-50%);
+          background:white;border:1.5px solid ${m.color}66;
+          border-radius:6px;padding:2px 7px;
+          font-size:11px;font-weight:700;color:${m.color};
+          white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.1);
+          font-family:Outfit,sans-serif;
+        ">${live}${m.unit}</div>
+      </div>
+    `,
+  });
 }
 
 export default function OdishaMap() {
-  const [selected, setSelected] = useState<EnergyNode | null>(null);
-  const [liveValues, setLiveValues] = useState<Record<string, number>>({});
-  const [tooltip, setTooltip] = useState<{ node: EnergyNode; x: number; y: number } | null>(null);
-  const [tick, setTick] = useState(0);
+  const mapRef      = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const markers     = useRef<Record<string, any>>({});
+  const polylines   = useRef<any[]>([]);
 
+  const [selected,   setSelected]   = useState<EnergyNode | null>(null);
+  const [liveValues, setLiveValues] = useState<Record<string, number>>(
+    Object.fromEntries(NODES.map((n) => [n.id, n.value]))
+  );
+
+  // Live value ticker
   useEffect(() => {
     const id = setInterval(() => {
-      const updates: Record<string, number> = {};
-      NODES.forEach((n) => {
-        updates[n.id] = +(n.value + (Math.random() - 0.5) * n.value * 0.08).toFixed(1);
+      setLiveValues((prev) => {
+        const next: Record<string, number> = {};
+        NODES.forEach((n) => {
+          next[n.id] = +(prev[n.id] + (Math.random() - 0.5) * n.value * 0.08).toFixed(1);
+        });
+        return next;
       });
-      setLiveValues(updates);
-      setTick((t) => t + 1);
     }, 3000);
     return () => clearInterval(id);
   }, []);
 
-  const FLOWS: [string, string][] = [
-    ["bbsr","ctk"],["ctk","ang"],["ang","rkl"],
-    ["puri","bbsr"],["bhm","puri"],["smb","rkl"],
-    ["blgr","smb"],["kndml","bbsr"],["krl","kndml"],
-  ];
+  // Bootstrap Leaflet
+  useEffect(() => {
+    if (!mapRef.current || mapInstance.current) return;
+
+    // Inject Leaflet CSS
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id   = "leaflet-css";
+      link.rel  = "stylesheet";
+      link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+      document.head.appendChild(link);
+    }
+
+    import("leaflet").then((L) => {
+      // Fix broken default icon paths from webpack
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      if ((mapRef.current as any)._leaflet_id) {
+  (mapRef.current as any)._leaflet_id = null;
+}
+
+      const map = L.map(mapRef.current!, {
+        center:           [20.5, 84.2],
+        zoom:             7,
+        zoomControl:      true,
+        scrollWheelZoom:  true,
+        attributionControl: false,
+      });
+
+      // OSM tiles with subtle styling
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        opacity: 0.88,
+      }).addTo(map);
+
+      // Attribution in corner
+      L.control.attribution({ prefix: "© OpenStreetMap", position: "bottomright" }).addTo(map);
+
+      mapInstance.current = map;
+
+      // Flow polylines
+      FLOWS.forEach(([aid, bid]) => {
+        const a = NODES.find((n) => n.id === aid)!;
+        const b = NODES.find((n) => n.id === bid)!;
+        const warn = a.status === "warning" || b.status === "warning";
+        const pl = L.polyline([[a.lat, a.lng],[b.lat, b.lng]], {
+          color:     warn ? "#eb442577" : "#6789be66",
+          weight:    warn ? 2.5 : 1.8,
+          dashArray: "7 6",
+        }).addTo(map);
+        polylines.current.push(pl);
+      });
+
+      // Node markers
+      NODES.forEach((node) => {
+        const live = node.value;
+        const icon = makeIcon(L, node, live);
+        const marker = L.marker([node.lat, node.lng], { icon, zIndexOffset: 500 })
+          .addTo(map)
+          .on("click", () => setSelected((p) => (p?.id === node.id ? null : node)));
+        markers.current[node.id] = marker;
+      });
+    });
+
+    return () => {
+      mapInstance.current?.remove();
+      mapInstance.current = null;
+    };
+  }, []);
+
+  // Update marker icons on every live tick
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    import("leaflet").then((L) => {
+      NODES.forEach((node) => {
+        const m = markers.current[node.id];
+        if (m) m.setIcon(makeIcon(L, node, liveValues[node.id] ?? node.value));
+      });
+    });
+  }, [liveValues]);
 
   const alertNodes = NODES.filter((n) => n.status === "warning");
 
@@ -75,7 +186,7 @@ export default function OdishaMap() {
           borderRadius: 14, padding: "11px 18px",
           display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
         }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#eb4425", flexShrink: 0, animation: "warnBlink 0.9s infinite" }} />
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#eb4425", flexShrink: 0, animation: "agWarn 0.9s infinite" }} />
           <span style={{ fontSize: 13, color: "#eb4425", fontWeight: 600 }}>
             {alertNodes.length} node{alertNodes.length > 1 ? "s" : ""} need attention:
           </span>
@@ -91,7 +202,7 @@ export default function OdishaMap() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 290px", gap: 12 }}>
 
-        {/* ── SVG Map ── */}
+        {/* ── Leaflet Map Card ── */}
         <div style={{
           background: "#fff", border: "1px solid var(--border)",
           borderRadius: 20, overflow: "hidden",
@@ -116,206 +227,13 @@ export default function OdishaMap() {
             </div>
           </div>
 
-          {/* Map area */}
-          <div style={{ position: "relative", background: "#f0f4f9", height: 460 }}>
-
-            {/* Background map image via OpenStreetMap static */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://tile.openstreetmap.org/7/92/59.png"
-              alt=""
-              style={{ display: "none" }}
-            />
-
-            {/* Odisha outline SVG background */}
-            <svg
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.06 }}
-            >
-              <rect width="100" height="100" fill="#6789be" />
-            </svg>
-
-            {/* Grid lines */}
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-              {[20,40,60,80].map((v) => (
-                <g key={v}>
-                  <line x1={v} y1={0} x2={v} y2={100} stroke="rgba(103,137,190,0.08)" strokeWidth="0.3" />
-                  <line x1={0} y1={v} x2={100} y2={v} stroke="rgba(103,137,190,0.08)" strokeWidth="0.3" />
-                </g>
-              ))}
-            </svg>
-
-            {/* Flow lines */}
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-              <defs>
-                <marker id="arrowBlue" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-                  <circle cx="2" cy="2" r="1.2" fill="#6789be88" />
-                </marker>
-                <marker id="arrowRed" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-                  <circle cx="2" cy="2" r="1.2" fill="#eb442588" />
-                </marker>
-              </defs>
-              {FLOWS.map(([aid, bid]) => {
-                const a = NODES.find((n) => n.id === aid)!;
-                const b = NODES.find((n) => n.id === bid)!;
-                const pa = toPercent(a.lat, a.lng);
-                const pb = toPercent(b.lat, b.lng);
-                const isWarn = a.status === "warning" || b.status === "warning";
-                return (
-                  <line key={`${aid}-${bid}`}
-                    x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
-                    stroke={isWarn ? "#eb442555" : "#6789be44"}
-                    strokeWidth={isWarn ? "0.6" : "0.4"}
-                    strokeDasharray="2 2"
-                    markerEnd={isWarn ? "url(#arrowRed)" : "url(#arrowBlue)"}
-                  />
-                );
-              })}
-            </svg>
-
-            {/* Node markers */}
-            {NODES.map((node) => {
-              const m = TYPE_META[node.type];
-              const s = STATUS_META[node.status];
-              const pos = toPercent(node.lat, node.lng);
-              const live = liveValues[node.id] ?? node.value;
-              const isWarn = node.status === "warning";
-              const isSelected = selected?.id === node.id;
-
-              return (
-                <div
-                  key={node.id}
-                  onClick={() => setSelected(isSelected ? null : node)}
-                  onMouseEnter={(e) => {
-                    const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                    const nx = e.currentTarget.getBoundingClientRect();
-                    setTooltip({ node, x: nx.left - rect.left, y: nx.top - rect.top });
-                  }}
-                  onMouseLeave={() => setTooltip(null)}
-                  style={{
-                    position: "absolute",
-                    left: `${pos.x}%`, top: `${pos.y}%`,
-                    transform: "translate(-50%, -50%)",
-                    cursor: "pointer", zIndex: isSelected ? 20 : 10,
-                  }}
-                >
-                  {/* Outer pulse */}
-                  <div style={{
-                    position: "absolute", inset: -10, borderRadius: "50%",
-                    background: `${isWarn ? "#eb4425" : m.color}18`,
-                    border: `1px solid ${isWarn ? "#eb4425" : m.color}33`,
-                    animation: `mapPulse ${isWarn ? "1s" : "2.8s"} ease-out infinite`,
-                  }} />
-                  {/* Middle ring */}
-                  <div style={{
-                    position: "absolute", inset: -5, borderRadius: "50%",
-                    background: `${m.color}15`,
-                    border: `1.5px solid ${m.color}55`,
-                  }} />
-                  {/* Core */}
-                  <div style={{
-                    width: 16, height: 16, borderRadius: "50%",
-                    background: m.color,
-                    border: isSelected ? `3px solid #fff` : `2px solid ${m.color}cc`,
-                    boxShadow: `0 0 ${isSelected ? 16 : 8}px ${m.color}${isSelected ? "cc" : "77"}`,
-                    position: "relative", zIndex: 2,
-                    transform: isSelected ? "scale(1.3)" : "scale(1)",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    animation: isWarn ? "warnBlink 0.9s infinite" : "none",
-                  }} />
-                  {/* Live value label */}
-                  <div style={{
-                    position: "absolute", top: -22, left: "50%", transform: "translateX(-50%)",
-                    background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
-                    border: `1px solid ${m.color}44`,
-                    borderRadius: 6, padding: "1px 6px",
-                    fontSize: 10, fontWeight: 700, color: m.color,
-                    whiteSpace: "nowrap", pointerEvents: "none",
-                    boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
-                    transition: "opacity 0.3s",
-                  }}>
-                    {live}{m.unit}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Hover tooltip */}
-            {tooltip && (
-              <div style={{
-                position: "absolute",
-                left: tooltip.x + 20, top: tooltip.y - 10,
-                background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
-                border: "1px solid var(--border2)", borderRadius: 12,
-                padding: "10px 14px", zIndex: 100, pointerEvents: "none",
-                boxShadow: "0 8px 24px rgba(103,137,190,0.18)",
-                minWidth: 160, animation: "fadeUp 0.15s ease both",
-              }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>{tooltip.node.name}</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <span style={{
-                    fontSize: 11, padding: "2px 8px", borderRadius: 6,
-                    background: `${TYPE_META[tooltip.node.type].color}15`,
-                    color: TYPE_META[tooltip.node.type].color, fontWeight: 600,
-                  }}>{TYPE_META[tooltip.node.type].label}</span>
-                  <span style={{
-                    fontSize: 11, padding: "2px 8px", borderRadius: 6,
-                    background: `${STATUS_META[tooltip.node.status].color}15`,
-                    color: STATUS_META[tooltip.node.status].color, fontWeight: 600,
-                  }}>{STATUS_META[tooltip.node.status].label}</span>
-                </div>
-                <p style={{ fontSize: 14, fontWeight: 800, color: TYPE_META[tooltip.node.type].color, marginTop: 6 }}>
-                  {liveValues[tooltip.node.id] ?? tooltip.node.value} {TYPE_META[tooltip.node.type].unit}
-                </p>
-              </div>
-            )}
-
-            {/* City labels */}
-            {NODES.map((node) => {
-              const pos = toPercent(node.lat, node.lng);
-              return (
-                <div key={`label-${node.id}`} style={{
-                  position: "absolute",
-                  left: `${pos.x}%`, top: `${pos.y + 3.5}%`,
-                  transform: "translateX(-50%)",
-                  fontSize: 9.5, color: "var(--text3)", fontWeight: 500,
-                  whiteSpace: "nowrap", pointerEvents: "none",
-                  textShadow: "0 1px 3px rgba(255,255,255,0.9)",
-                }}>
-                  {node.name.split(" ")[0]}
-                </div>
-              );
-            })}
-
-            {/* Compass */}
-            <div style={{
-              position: "absolute", bottom: 16, right: 16,
-              width: 40, height: 40, borderRadius: "50%",
-              background: "rgba(255,255,255,0.9)", backdropFilter: "blur(8px)",
-              border: "1px solid var(--border2)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontWeight: 700, color: "var(--text2)",
-            }}>N↑</div>
-
-            {/* Scale legend */}
-            <div style={{
-              position: "absolute", bottom: 16, left: 16,
-              background: "rgba(255,255,255,0.9)", backdropFilter: "blur(8px)",
-              border: "1px solid var(--border)", borderRadius: 8,
-              padding: "6px 10px", fontSize: 10, color: "var(--text3)",
-            }}>
-              Odisha State Grid · Approx scale
-            </div>
-          </div>
+          {/* The actual Leaflet map div */}
+          <div ref={mapRef} style={{ height: 460, width: "100%" }} />
         </div>
 
         {/* ── Side panel ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
-          {/* Selected node */}
           {selected ? (
             <div style={{
               background: "rgba(255,255,255,0.85)", backdropFilter: "blur(16px)",
@@ -390,22 +308,24 @@ export default function OdishaMap() {
               const s = STATUS_META[n.status];
               const live = liveValues[n.id] ?? n.value;
               return (
-                <div key={n.id} onClick={() => setSelected(selected?.id === n.id ? null : n)} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "8px 10px", borderRadius: 10, marginBottom: 3,
-                  background: selected?.id === n.id ? `${m.color}12` : "transparent",
-                  border: selected?.id === n.id ? `1px solid ${m.color}25` : "1px solid transparent",
-                  cursor: "pointer", transition: "all 0.15s",
-                }}
-                  onMouseEnter={(e) => { if (selected?.id !== n.id) e.currentTarget.style.background = "var(--surface2)"; }}
-                  onMouseLeave={(e) => { if (selected?.id !== n.id) e.currentTarget.style.background = "transparent"; }}
+                <div key={n.id}
+                  onClick={() => setSelected(selected?.id === n.id ? null : n)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 10px", borderRadius: 10, marginBottom: 3,
+                    background: selected?.id === n.id ? `${m.color}12` : "transparent",
+                    border: selected?.id === n.id ? `1px solid ${m.color}25` : "1px solid transparent",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => { if (selected?.id !== n.id) (e.currentTarget as HTMLElement).style.background = "var(--surface2)"; }}
+                  onMouseLeave={(e) => { if (selected?.id !== n.id) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
                   <div style={{ position: "relative", width: 12, height: 12, flexShrink: 0 }}>
                     {n.status !== "idle" && (
                       <div style={{
                         position: "absolute", inset: -3, borderRadius: "50%",
                         background: s.color + "28",
-                        animation: `mapPulse ${n.status === "warning" ? "1s" : "2.5s"} ease-out infinite`,
+                        animation: `agPulse ${n.status === "warning" ? "1s" : "2.5s"} ease-out infinite`,
                       }} />
                     )}
                     <div style={{ width: 12, height: 12, borderRadius: "50%", background: m.color, position: "relative" }} />
@@ -428,10 +348,10 @@ export default function OdishaMap() {
       {/* Bottom stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
         {[
-          { label: "Total Solar",       value: `${NODES.filter(n=>n.type==="solar").reduce((s,n)=>s+(liveValues[n.id]??n.value),0).toFixed(1)} kW`, color: "#e6a817" },
-          { label: "Grid Active",       value: `${NODES.filter(n=>n.type==="grid"&&n.status==="active").length}/${NODES.filter(n=>n.type==="grid").length} nodes`, color: "#6789be" },
-          { label: "Avg Battery",       value: `${Math.round(NODES.filter(n=>n.type==="battery").reduce((s,n)=>s+(liveValues[n.id]??n.value),0)/NODES.filter(n=>n.type==="battery").length)}%`, color: "#22c55e" },
-          { label: "Alerts",            value: `${NODES.filter(n=>n.status==="warning").length} warnings`, color: "#eb4425" },
+          { label: "Total Solar",  value: `${NODES.filter(n=>n.type==="solar").reduce((s,n)=>s+(liveValues[n.id]??n.value),0).toFixed(1)} kW`, color: "#e6a817" },
+          { label: "Grid Active",  value: `${NODES.filter(n=>n.type==="grid"&&n.status==="active").length}/${NODES.filter(n=>n.type==="grid").length} nodes`, color: "#6789be" },
+          { label: "Avg Battery",  value: `${Math.round(NODES.filter(n=>n.type==="battery").reduce((s,n)=>s+(liveValues[n.id]??n.value),0)/NODES.filter(n=>n.type==="battery").length)}%`, color: "#22c55e" },
+          { label: "Alerts",       value: `${NODES.filter(n=>n.status==="warning").length} warnings`, color: "#eb4425" },
         ].map((s) => (
           <div key={s.label} style={{
             background: "rgba(255,255,255,0.75)", backdropFilter: "blur(16px)",
@@ -445,10 +365,26 @@ export default function OdishaMap() {
       </div>
 
       <style>{`
-        @keyframes mapPulse  { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(2.4);opacity:0} }
-        @keyframes warnBlink { 0%,100%{opacity:1} 50%{opacity:0.25} }
-        @keyframes slideIn   { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes fadeUp    { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes agPulse { 0%{transform:scale(1);opacity:0.7} 100%{transform:scale(2.6);opacity:0} }
+        @keyframes agWarn  { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        @keyframes slideIn { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:translateX(0)} }
+
+        .leaflet-container { font-family: Outfit, sans-serif !important; }
+        .leaflet-tile-pane  { filter: saturate(0.75) brightness(1.02); }
+        .leaflet-control-zoom {
+          border: 1px solid var(--border) !important;
+          border-radius: 10px !important;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(103,137,190,0.15) !important;
+        }
+        .leaflet-control-zoom a { color: var(--text2) !important; }
+        .leaflet-control-zoom a:hover { background: #eef2f8 !important; }
+        .leaflet-control-attribution {
+          font-size: 9px !important;
+          background: rgba(255,255,255,0.7) !important;
+          backdrop-filter: blur(6px);
+          border-radius: 6px 0 0 0 !important;
+        }
       `}</style>
     </div>
   );

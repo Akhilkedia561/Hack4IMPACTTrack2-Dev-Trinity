@@ -6,6 +6,7 @@ import LiveMetrics from "@/components/Dashboard/LiveMetrics";
 import EnergyChart from "@/components/Dashboard/EnergyChart";
 import OptimizerButton from "@/components/Dashboard/OptimizerButton";
 import ImpactSliders from "@/components/Dashboard/ImpactSliders";
+import ApplianceScheduler from "@/app/dashboard/ApplianceScheduler";
 import PredictionPanel from "@/components/Prediction/PredictionPanel";
 import { EnergyReading } from "@/types/energy";
 
@@ -74,7 +75,7 @@ export default function ClientDashboard() {
   }, []);
 
   const PAGE_TITLES: Record<Tab, { title: string; sub: string }> = {
-    dashboard:  { title: "Live Energy Dashboard",        sub: "Real-time solar production, consumption & AI optimization" },
+    dashboard:  { title: "Live Energy Dashboard",   sub: "Real-time solar production, consumption & AI optimization" },
     prediction: { title: "Solar Prediction Engine", sub: "24-hour forecast using live weather data from Open-Meteo" },
     map:        { title: "Odisha Grid Map",          sub: "Energy nodes and live flow across Odisha" },
   };
@@ -106,6 +107,10 @@ export default function ClientDashboard() {
               <OptimizerButton />
               <ImpactSliders />
             </div>
+            <ApplianceScheduler
+              liveReading={current ?? undefined}
+              city="Bhubaneswar"
+            />
           </div>
         )}
         {activeTab === "prediction" && <PredictionPanel />}
